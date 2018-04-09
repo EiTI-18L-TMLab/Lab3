@@ -1,0 +1,13 @@
+2. licznik 8-bitowy - ³adowanie, zliczanie w dó³ - kod NKB
+
+UWAGI:
+
+- wyœwietlanie statyczne: dwie cyfry szesnastkowe na wyœwietlaczu 7-segmentowym,
+
+- sterowanie: dwa przyciski (CLK - aktywne zboczem; LD aktywne poziomem) - co najmniej jeden obs³ugiwany w przerwaniu,
+
+- ³adowanie: wartoœci¹ z portu wejœciowego odczytywan¹ z nastawników hex,
+
+- program steruj¹cy nale¿y napisaæ w asemblerze MSP430,
+
+- proszê zastanowiæ siê nad dekompozycj¹ kodu na czêœæ realizuj¹c¹ obs³ugê sprzêtu i czêœæ aplikacyjn¹.
