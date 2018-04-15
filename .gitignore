@@ -1,0 +1,12 @@
+
+Debug/
+
+Release/
+
+settings/
+
+*.dep
+
+*.ewp
+
+*.ewt

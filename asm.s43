@@ -1,0 +1,119 @@
+; Licznik 8-bit, kod NKB, ladowanie, zliczanie w dól
+;
+; Wykorzystanie rejestrów: 
+;	R4 - zawiera wartosc licznka, 
+;	R5 - licznik debounce, 
+;	R6 - ilosc cykli debounce
+;	R7 - stan ukladu, 
+;               bit 0 --> 1 dla obslugi zbocza narastajacego, 0 dla obslugi zbocza opadajacego;
+;               bit 1 --> 1 - petla main pracuje, 0 - petla main ukonczyla wszystkie dotychczasowe zadania(zezwolenie na uspienie CPU)
+;
+; Podlaczenie przycisków: 
+;	CLK - P1.6, zrodlo przerwania, zmienne zbocze aktywne
+;	!LD - P1.5, zrodlo przerwania, zbocze opadajace
+;	DATA - P3
+;
+#include "msp430.h"                     ; #define controlled include file
+
+        NAME    MAIN                    ; module name
+
+        PUBLIC  MAIN                    ; make the main label vissible
+                                        ; outside this module
+        ORG     0FFFEh
+        DC16    init                    ; set reset vector to 'init' label
+
+        ORG     0FFE8h
+        DC16    P1_INT_VECTOR           ; set P1 interrupt vector to 'P1_INT_VECTOR' label
+
+        RSEG    CSTACK                  ; pre-declaration of segment
+        RSEG    CODE                    ; place program in 'CODE' segment
+
+P1_INT_VECTOR:                          ; procedura obslugi przerwania P1
+        BIT.B #020h, &P1IFG             ; sprawdzenie czy aktywne jest zadanie przerwania lub niski stan na LD
+        JNZ P1_INT_VEC_LOAD
+        BIT.B #020h, &P1IN      ; 
+        JNZ P1_INT_VEC_LOAD_DONE        
+P1_INT_VEC_LOAD:                        ; ciagle ladowanie gdy niski stan LD
+        BIC.B #020h, P1IFG              ; zgaszenie flagi przerwania od LD(P1.5)
+	MOV.B &P3IN, R4 	        ; zaladowanie nowej wartosci licznika
+	MOV.B R4, &P4OUT	        ; odswiezenie wyswietlania
+        JMP P1_INT_VECTOR        
+P1_INT_VEC_LOAD_DONE:
+        BIT.B #040h, &P1IFG             ; sprawdzenie przerwania od CLK(P1.6)
+        JZ P1_INT_VEC_CLK_DONE
+        BIC.B #040h, &P1IE              ; interesuje nas tylko pierwsze przerwanie od CLK
+        BIC.B #040h, &P1IFG             ; zgaszenie flagi przerwania od CLK
+        BIC #CPUOFF+SCG1+SCG0,0(SP)     ; powrót z przerwania ze zmienionym SR
+P1_INT_VEC_CLK_DONE:
+        RETI        
+init:   
+        MOV     #SFE(CSTACK), SP        ; set up stack  
+MAIN:
+        MOV.W   #WDTPW+WDTHOLD,&WDTCTL  ; Stop watchdog timer
+        MOV.B   #0FFh, &P4DIR
+        MOV.B   #0FFh, &P4OUT
+        MOV.B   #000h, &P1IFG
+        MOV.B   #060h, &P1IE    ; aktywacja przerwan od CLK i LD
+        
+	MOV.B &P3IN, R4 	; inicjacja wartosci licznika
+	MOV.B R4, &P4OUT	; odswiezenie licznika
+	MOV 255, R6 	        ; ilosc cykli debounce
+	EINT                    ; globalna aktywacja przerwan
+	MOV R6, R5 	        ; ustawienie licznika debounce
+	BIC #0FFh, R7 	        ; wybrana obsluga zbocza opadajacego, main sygnalizuje ukonczenie zadan
+MAIN_LOOP: 		        ; poczatek glównej petli
+        BIC #02h, R7
+	; poczatek obslugi licznika
+        BIT #01h, R7
+	JNZ LOOP_POSITIVE       ; wybranie obslugi konkretnego zbocza
+LOOP_NEGATIVE:	                ; obsluga zbocza opadajacego
+	BIT.B #040h, &P1IN	; stan przycisku CLK
+	JZ IF_1
+	MOV R6, R5 	        ; jesli przycisk niewcisniety, zaladuj licznik debounce
+IF_1:
+	JNZ IF_2
+	DEC R5 		        ; jesli przycisk wcisniety, dekrementuj licznik debounce
+IF_2:
+	CMP 0, R5 		; czy licznik debounce równy zero
+	JZ IF_2_CONTINUE        ; jesli licznik debounce zerowy, dalsza obsluga
+        BIS #02h, R7            ; sygnalizacja pracy w toku
+	JMP COUNTER_END
+IF_2_CONTINUE:
+	DEC R4		        ; wykryto poprawne zbocze opadajace, akcja licznika
+	;DINT			; sekcja krytyczna
+	MOV.B R4, &P4OUT	; odswiezenie LED
+	;EINT			; koniec sekcji krytycznej
+	BIS #01h, R7            ; wybranie obslugi zbocza narastajacego
+        BIC.B #040h, &P1IE      ; wylaczenie przerwania od CLK(P1.6)
+        BIC.B #040h, &P1IES     ; wybranie zbocza narastajacego
+        BIC.B #040h, &P1IFG     ; wyzerowanie zadania przerwania od CLK
+        BIS.B #040h, &P1IE      ; wlaczenie przerwania od CLK
+	JMP COUNTER_END         ; skok na koniec obslugi licznika
+LOOP_POSITIVE:	                ; obsluga zbocza narastajacego
+	BIT.B #040h, &P1IN	; stan przycisku CLK
+	JNZ IF_3
+	MOV R6, R5 	        ; jesli przycisk niewcisniety, zaladuj licznik debounce
+IF_3:
+	JZ IF_4
+	DEC R5		        ; jesli przycisk niewcisniety, dekrementuj licznik debounce
+IF_4:
+	CMP 0, R5	        ; odswiezenie stanu flag
+	JZ IF_4_CONTINUE        ; jesli licznik debounce zerowy, dalsza obsluga
+        BIS #02h, R7            ; sygnalizacja pracy w toku
+	JMP COUNTER_END
+        IF_4_CONTINUE:
+	BIC #01h, R7            ; wybranie obslugi zbocza opadajacego
+        BIC.B #040h, &P1IE      ; wylaczenie przerwania od CLK(P1.6)
+        BIS.B #040h, &P1IES     ; wybranie zbocza opadajacego
+        BIC.B #040h, &P1IFG     ; wyzerowanie zadania przerwania od CLK
+        BIS.B #040h, &P1IE      ; wlaczenie przerwania od CLK
+COUNTER_END:	; koniec obslugi licznika
+
+        ; dalsze operacje...	
+        
+        ; jesli zadna operacja nie zglosila pracy w toku przejdz w tryb uspienia
+        BIT #02h, R7
+        JNZ MAIN_LOOP
+        BIS #GIE+CPUOFF+SCG1+SCG0,SR ; aktywacja LPM3 - program zatrzymuje sie w tym miejscu
+        JMP MAIN_LOOP ; powrót do poczatku glównej petli
+END

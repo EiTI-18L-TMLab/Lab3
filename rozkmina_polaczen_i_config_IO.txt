@@ -1,0 +1,9 @@
+uC: MSP430F1611
+P1 - 8xmonostable --> P1DIR=0x00	P1SEL=0x00	P1IE=0x60	interrupt vector = 0xFFE8
+P1.5 - !LD | P1.6 - CLK
+P3 - hex switch   --> P3DIR=0x00 	P3SEL=0x00
+P4 - 2x7seg LCD   <-- P4DIR=0xff 	P4SEL=0x00	P4OUT=0xff
+wymagane czyszczenie flag przerwañ w rejestrze P1IFG
+P1IES=0 wybranie przerwania low-to-high 
+P1IES=1 wybranie przerwania high-to-low 
+odczyt rejestru poprzez PxIN
