@@ -18,7 +18,7 @@
 \sisetup{detect-weight,exponent-product=\cdot,output-decimal-marker={,},per-mode=symbol,binary-units=true,range-phrase={-},range-units=single}
 
 \SendSettingsToPgf
-\title{\bf Sprawozdanie z laboratorium nr 3\\ Projekt licznika 8-bitowego przy użyciu mikrokontrolera z rodziny MSP430F16x  \vskip 0.1cm}
+\title{\bf Sprawozdanie z laboratorium nr 3\\ Projekt licznika 8-bitowego przy użyciu mikrokontrolera z rodziny MSP430  \vskip 0.1cm}
 \author{Jakub Sikora \and Konrad Winnicki \and Marcin Dolicher}
 \date{\today}
 \pgfplotsset{compat=1.15}	
@@ -62,7 +62,7 @@
 \indent{} Celem trzeciego zadania laboratoryjnego było zaprojektowanie, złożenie, zaprogramowanie i przetestowanie układu z mikrokontrolerem MSP430F16x tak aby działał on jako licznik 8-bitowy zliczający w dół liczbę wciśnięć programowo odszumionego przycisku monostabilnego, który umożliwiał asynchroniczne ładowanie liczby do pamięci z blokowaniem zliczania. Ładowanie liczby powinno odbyć się przy pomocy przerwania maskowalnego. Liczby powinny być przechowywane w Naturalnym Kodzie Binarnym, w skrócie NKB.
 
 \section{Szczegółowe uwagi}
-\indent W odróżnieniu do zadania z drugiego laboratorium, wyświetlanie zawartości licznika powinno odbyć się na dwóch wyświetlaczach 7-segmentowych. Liczby powinny być wyświetlane w postaci szesnastkowej. Ładowanie zawartości licznika ma odbywać się za pomocą nastawników hex, a sterowanie licznikiem ma odbywać się za pomocą dwóch przycisków, z czego co najmniej jeden ma być obsługiwany w przerwaniu. Ostatecznie, w momencie gdy procesor nic nie robi, powinien przejść w tryb oszczędzania energii LPM0.
+\indent W odróżnieniu do zadania z drugiego laboratorium, licznik stał się 8-bitowy a wyświetlanie zawartości licznika powinno odbyć się na dwóch wyświetlaczach 7-segmentowych. Liczby powinny być wyświetlane w postaci szesnastkowej. Ładowanie zawartości licznika ma odbywać się za pomocą nastawników hex, a sterowanie licznikiem ma odbywać się za pomocą dwóch przycisków, z czego co najmniej jeden ma być obsługiwany w przerwaniu. Ostatecznie, w momencie gdy procesor nic nie robi, powinien przejść w tryb oszczędzania energii LPM0.
 
 \chapter{Projekt licznika}
 
