@@ -4,27 +4,21 @@
 \usepackage{polski}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
-\usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{graphicx}
-\usepackage{url}
-\usepackage{tikz}
-\usetikzlibrary{arrows,calc,decorations.markings,math,arrows.meta}
+\usepackage{mathrsfs}
 \usepackage{rotating}
-\usepackage[percent]{overpic}
-%\usepackage[cp1250]{inputenc}
-\usepackage{xcolor}
 \usepackage{pgfplots}
 \usetikzlibrary{pgfplots.groupplots}
-\usepackage{listings}
-\usepackage{matlab-prettifier}
+
 \usepackage{siunitx}
-\usepackage{placeins}
+
+\usepackage{float}
 \definecolor{szary}{rgb}{0.95,0.95,0.95}
 \sisetup{detect-weight,exponent-product=\cdot,output-decimal-marker={,},per-mode=symbol,binary-units=true,range-phrase={-},range-units=single}
 
 \SendSettingsToPgf
-\title{\bf Sprawozdanie z laboratorium nr 3 \\ Projekt licznika 8-bitowego przy użyciu mikrokontrolera MSP430 \vskip 0.1cm}
+\title{\bf Sprawozdanie z laboratorium nr 3\\ Projekt licznika 8-bitowego przy użyciu mikrokontrolera z rodziny MSP430F16x  \vskip 0.1cm}
 \author{Jakub Sikora \and Konrad Winnicki \and Marcin Dolicher}
 \date{\today}
 \pgfplotsset{compat=1.15}	
@@ -63,4 +57,176 @@
 \tableofcontents
 
 
+\chapter{Zadanie laboratoryjne}
+\section{Polecenie}
+\indent{} Celem trzeciego zadania laboratoryjnego było zaprojektowanie, złożenie, zaprogramowanie i przetestowanie układu z mikrokontrolerem MSP430F16x tak aby działał on jako licznik 8-bitowy zliczający w dół liczbę wciśnięć programowo odszumionego przycisku monostabilnego, który umożliwiał asynchroniczne ładowanie liczby do pamięci z blokowaniem zliczania. Ładowanie liczby powinno odbyć się przy pomocy przerwania maskowalnego. Liczby powinny być przechowywane w Naturalnym Kodzie Binarnym, w skrócie NKB.
+
+\section{Szczegółowe uwagi}
+\indent W odróżnieniu do zadania z drugiego laboratorium, wyświetlanie zawartości licznika powinno odbyć się na dwóch wyświetlaczach 7-segmentowych. Liczby powinny być wyświetlane w postaci szesnastkowej. Ładowanie zawartości licznika ma odbywać się za pomocą nastawników hex, a sterowanie licznikiem ma odbywać się za pomocą dwóch przycisków, z czego co najmniej jeden ma być obsługiwany w przerwaniu. Ostatecznie, w momencie gdy procesor nic nie robi, powinien przejść w tryb oszczędzania energii LPM0.
+
+\chapter{Projekt licznika}
+
+\section{Opis sprzętu}
+\indent{} Zmiana platformy z procesora Z80 na mikrokontroler MSP43016x znacząco ułatwiało zadanie i pozwoliło na dokonanie kilku ulepszeń w projekcie. Mikrokontroler ma wbudowane układy podtrzymujące w swoich portach wejścia/wyjścia dlatego też nie są potrzebne dodatkowe układy złożone z buforów trójstanowych. Schemat ideowy układu znajduje się na rysunku poniżej.
+
+\begin{figure}[th]
+\centering
+\includegraphics[width=\textwidth]{ideowy}
+\caption{Schemat ideowy}
+\end{figure}
+
+Do portu pierwszego podłączyliśmy zestaw ośmiu przycisków monostabilnych za pomocą których użytkownik może obsługiwać licznik. Do portu trzeciego podłączyliśmy obrotowe nastawniki liczby w kodzie heksadecymalnym. Ostatecznie do portu czwartego podłączyliśmy układ z dwoma wyświetlaczami siedmiosegmentowymi wraz z odpowiednim dekoderem. W porównaniu z rozwiązaniem opartym na procesor Z80, zastosowanie mikrokontrolera znacząco upraszcza ostateczny układ. Mniejsza ilość peryferiali jest możliwa dzięki wewnętrznym rejestrom, które są przypisane do odpowiednich portów.
+
+\section{Opis oprogramowania}
+\indent W trakcie projektowania oprogramowania skupiliśmy się na tym aby nasze rozwiązanie pobierało jak najmniej energii. W trakcie oczekiwania na wciśnięcie przycisku, procesor miał pozostawać w stanie ograniczonego poboru mocy, podczas którego zegary procesora pozostawały wyłączone. Wyjście z tego stanu odbywało się za pomocą przerwania maskowalnego. Po przyjęciu przerwania i jego obsłużeniu, program miał zadecydować czy ma coś jeszcze do zrobienia czy jednak może wrócić do stanu niskiego poboru mocy. W przypadku asynchronicznego ładowania, po wczytaniu liczby procesor mógł spokojnie przejść w stan oczekiwania. Po wciśnięciu przycisku \texttt{CLK}, mikrokontroler powinien rozpocząć procedurę odszumiania przycisku.
+
+\subsection{Odszumianie przycisku}
+\indent W momencie wciśnięcia przycisku \texttt{CLK} program przechodzi do specjalnej procedury podczas której zliczane są kolejne niskie stany przycisku. Po pojawieniu się kolejnych 256 niskich stanów pod rząd, program uznaje że przycisk się już ustabilizował i traktuje to jako jedno wciśnięcie. Program następnie oczekuje na kolejne 256 wysokich stanów, które świadczą o puszczeniu i ustabilizowaniu przycisku. Po odnotowaniu takiej sytuacji, procesor przechodzi w tryb zmniejszonego poboru mocy i oczekuje na kolejne przerwanie pochodzące albo od przycisku \texttt{LD} albo \texttt{CLK}
+
+\subsection{Przerwania}
+\indent Procedura przerwania zostaje wywołana przy wciśnięciu przycisku \texttt{LD} lub \texttt{CLK}. W trakcie tej procedury, sprawdzane jest od którego przycisku przyszło przerwanie. Podczas obsługi przycisku ładowania, pobierana jest wartość z nastawników hex a następnie zostaje ona załadowana do pamięci i wypuszczona na wyświetlacze. Ostatecznie po odświeżeniu, procesor wraca do trybu zmniejszonego poboru mocy. W przypadku przyjęcia przerwania od przycisku zegarowego, program przechodzi do głównej pętli programu a do trybu zmniejszonego poboru mocy przechodzi tylko w po zakończeniu obsługi wciśnięcia przycisku.
+
+\subsection{Kod programu}
+\medskip
+\noindent
+;-------------------------------------------------------------------------------\\
+; MSP430 Assembler Code Template for use with TI Code Composer Studio\\
+;\\
+;\\
+;-------------------------------------------------------------------------------\\
+            .cdecls C,LIST,"msp430.h"       ; Include device header file\\
+            \\
+;-------------------------------------------------------------------------------\\
+            .def    RESET                   ; Export program entry-point to\\
+                                            ; make it known to linker.\\
+;-------------------------------------------------------------------------------\\
+            .text                           ; Assemble into program memory.\\
+            .retain                         ; Override ELF conditional linking\\
+                                            ; and retain current section.\\
+            .retainrefs                     ; And retain any sections that have\\
+                                            ; references to current section.\\
+\\
+;-------------------------------------------------------------------------------\\
+\\
+\\
+\\
+;-------------------------------------------------------------------------------\\
+; Main loop here\\
+;-------------------------------------------------------------------------------\\
+RESET:\\
+        MOV.W   \#\_{}\_{}STACK\_END,SP        ; set up stack\\
+MAIN:\\
+	MOV.B \#0FFh, \&P2DIR\\
+\\
+	MOV.W   \#WDTPW|WDTHOLD,\&WDTCTL  ;Stop watchdog timer\\
+    MOV.B   \#0FFh, \&P4DIR\\
+    MOV.B   \#0FFh, \&P4OUT\\
+    MOV.B   \#000h, \&P1IFG\\
+    MOV.B   \#060h, \&P1IE    ; aktywacja przerwan od CLK i LD\\
+    MOV.B	\#060h, \&P1IES\\
+\\
+	MOV.B \&P3IN, R4 		; inicjacja wartosci licznika\\
+	MOV.B R4, \&P4OUT		; odswiezenie licznika\\
+	MOV \#01Fh, R6 	        ; ilosc cykli debounce\\
+	MOV R6, R5 	        	; ustawienie licznika debounce\\
+	BIC \#0FFh, R7 	        ; wybrana obsluga zbocza opadajacego, main sygnalizuje ukonczenie zadan\\
+\\
+    BIS \#GIE+CPUOFF,SR 		; aktywacja LPM1 - program zatrzymuje sie w tym miejscu\\
+MAIN\_ LOOP: 		        	; poczatek głównej petli\\
+    BIC \#02h, R7\\
+\\
+	; poczatek obslugi licznika\\
+    BIT \#01h, R7\\
+	JNZ LOOP\_{}POSITIVE       ; wybranie obslugi konkretnego zbocza\\
+LOOP\_{}NEGATIVE:	            ; obsluga zbocza opadajacego\\
+	BIT.B \#040h, \&P1IN		; stan przycisku CLK\\
+	JZ IF\_{}1\\
+	MOV R6, R5 	        	; jesli przycisk niewcisniety, zaladuj licznik debounce\\
+    BIS \#02h, R7            ; sygnalizacja pracy w toku\\
+    BIC.B \#040h, \&P1IE      ; wylaczenie przerwania od CLK(P1.6)\\
+    BIS.B \#040h, \&P1IES     ; wybranie zbocza opadajacego\\
+    BIC.B \#040h, \&P1IFG     ; wyzerowanie zadania przerwania od CLK\\
+    BIS.B \#040h, \&P1IE      ; wlaczenie przerwania od CLK\\
+	JMP COUNTER\_{}END\\
+IF\_{}1:\\
+	JNZ IF\_{}2\\
+	DEC R5 		        	; jesli przycisk wcisniety, dekrementuj licznik debounce\\
+IF\_{}2:\\
+	CMP \#0, R5 				; czy licznik debounce równy zero\\
+	JZ IF\_{}2\_{}CONTINUE        ; jesli licznik debounce zerowy, dalsza obsluga\\
+    BIS \#02h, R7            ; sygnalizacja pracy w toku\\
+	JMP COUNTER\_{}END\\
+IF\_{}2\_{}CONTINUE:\\
+    BIS \#02h, R7            ; sygnalizacja pracy w toku\\
+	DEC R4		        	; wykryto poprawne zbocze opadajace, akcja licznika\\
+	MOV.B R4, \&P4OUT		; odswiezenie LED\\
+	BIS \#01h, R7            ; wybranie obslugi zbocza narastajacego\\
+	JMP COUNTER\_{}END         ; skok na koniec obslugi licznika\\
+LOOP\_{}POSITIVE:	            ; obsluga zbocza narastajacego\\
+    BIS \#02h, R7            ; sygnalizacja pracy w toku\\
+	BIT.B \#040h, \&P1IN		; stan przycisku CLK\\
+	JNZ IF\_{}3\\
+	MOV R6, R5 	        	; jesli przycisk wcisniety, zaladuj licznik debounce\\
+IF\_{}3:\\
+	JZ IF\_{}4\\
+	DEC R5		        	; jesli przycisk niewcisniety, dekrementuj licznik debounce\\
+IF\_{}4:\\
+	CMP \#0, R5	        	; odswiezenie stanu flag\\
+	JZ IF\_{}4\_{}CONTINUE        ; jesli licznik debounce zerowy, dalsza obsluga W IF\_{}4\_{}CONTINUE\\
+    BIS \#02h, R7            ; sygnalizacja pracy w toku\\
+	JMP COUNTER\_{}END\\
+IF\_{}4\_{}CONTINUE:\\
+	BIC \#01h, R7            ; wybranie obslugi zbocza opadajacego\\
+    BIC.B \#040h, \&P1IE      ; wylaczenie przerwania od CLK(P1.6)\\
+    BIS.B \#040h, \&P1IES     ; wybranie zbocza opadajacego\\
+    BIC.B \#040h, \&P1IFG     ; wyzerowanie zadania przerwania od CLK\\
+    BIS.B \#040h, \&P1IE      ; wlaczenie przerwania od CLK\\
+    MOV R6, R5				; zaladowanie licznika debounce\\
+COUNTER\_{}END:				; koniec obslugi licznika\\
+\\
+    ; dalsze operacje...\\
+\\
+    ; jesli zadna operacja nie zglosila pracy w toku przejdz w tryb uspienia\\
+    BIT \#02h, R7\\
+    JNZ MAIN\_{}LOOP\\
+	BIS \#GIE+CPUOFF,SR ; aktywacja LPM3 - program zatrzymuje sie w tym miejscu\\
+\\
+    JMP MAIN\_{}LOOP ; powrót do poczatku glównej petli    \\
+\\
+P1\_{}INT\_{}VECTOR:                          ; procedura obslugi przerwania P1\\
+        BIT.B \#020h, \& P1IFG             ; sprawdzenie czy aktywne jest zadanie przerwania lub niski stan na LD\\
+        JNZ P1\_{}INT\_{}VEC\_{}LOAD\\
+        BIT.B \#020h, \& P1IN      ;\\
+        JNZ P1\_{}INT\_{}VEC\_{}LOAD\_{}DONE\\
+P1\_{}INT\_{}VEC\_{}LOAD:                        ; ciagle ladowanie gdy niski stan LD\\
+        BIC.B \#020h, P1IFG              ; zgaszenie flagi przerwania od LD(P1.5)\\
+		MOV.B \&P3IN, R4 	        ; zaladowanie nowej wartosci licznika\\
+		MOV.B R4, \&P4OUT	        ; odswiezenie wyswietlania\\
+        JMP P1\_{}INT\_{}VECTOR\\
+P1\_{}INT\_{}VEC\_{}LOAD\_{}DONE:\\
+        BIT.B \#040h, \&P1IFG             ; sprawdzenie przerwania od CLK(P1.6)\\
+        JZ P1\_{}INT\_{}VEC\_{}CLK\_{}DONE\\
+        BIC.B \#040h, \&P1IE              ; interesuje nas tylko pierwsze przerwanie od CLK\\
+        BIC.B \#040h, \&P1IFG             ; zgaszenie flagi przerwania od CLK\\
+        BIC \#CPUOFF+SCG1+SCG0,0(SP)     ; powrót z przerwania ze zmienionym SR\\
+P1\_{}INT\_{}VEC\_{}CLK\_{}DONE:\\
+        RETI\\
+\\
+\\
+;-------------------------------------------------------------------------------\\
+; Stack Pointer definition\\
+;-------------------------------------------------------------------------------\\
+            .global \_{}\_{}STACK\_{}END\\
+            .sect   .stack\\
+\\
+;-------------------------------------------------------------------------------\\
+; Interrupt Vectors\\
+;-------------------------------------------------------------------------------\\
+            .sect   ".reset"                ; MSP430 RESET Vector\\
+            .short  RESET\\
+\\
+            .sect ".int04"\\
+            .short P1\_{}INT\_{}VECTOR 
+            
+       
 \end{document}
